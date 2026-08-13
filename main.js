@@ -7,8 +7,10 @@ class UniversalKnowledgeBridge extends obsidian_1.Plugin {
         this.settings = { ...DEFAULTS, ...(await this.loadData()) };
         this.addSettingTab(new BridgeSettings(this.app, this));
         this.addCommand({ id: "sync-approved-notes", name: "Sync approved notes", callback: () => void this.sync() });
+        this.addCommand({ id: "pull-remote-test-note", name: "Pull remote test note", callback: () => void this.pullRemoteTest() });
     }
     async sync() {
+        new obsidian_1.Notice("Knowledge bridge sync started.", 5000);
         try {
             if (!this.settings.bridgeUrl || !this.settings.pairingToken) {
                 new obsidian_1.Notice("Configure the knowledge bridge first.");
@@ -56,6 +58,29 @@ class UniversalKnowledgeBridge extends obsidian_1.Plugin {
         catch (error) {
             new obsidian_1.Notice(`Knowledge bridge sync failed: ${error instanceof Error ? error.message : String(error)}`, 10000);
             console.error("Universal Knowledge Bridge sync failed", error);
+        }
+    }
+    async pullRemoteTest() {
+        try {
+            new obsidian_1.Notice("Knowledge bridge test pull started.", 5000);
+            const notes = await this.listRemote();
+            const note = notes.find((item) => item.path === "Bridge-Test.md");
+            if (!note) {
+                new obsidian_1.Notice("Bridge-Test.md was not found in the remote vault.", 10000);
+                return;
+            }
+            const existing = this.app.vault.getAbstractFileByPath(note.path);
+            if (existing instanceof obsidian_1.TFile)
+                await this.app.vault.process(existing, () => note.content);
+            else
+                await this.app.vault.create(note.path, note.content);
+            this.settings.lastSynced[note.path] = { version: note.version, hash: note.hash };
+            await this.saveData(this.settings);
+            new obsidian_1.Notice("Bridge-Test.md downloaded successfully.", 10000);
+        }
+        catch (error) {
+            new obsidian_1.Notice(`Bridge test failed: ${error instanceof Error ? error.message : String(error)}`, 10000);
+            console.error("Universal Knowledge Bridge test pull failed", error);
         }
     }
     async listRemote() {
