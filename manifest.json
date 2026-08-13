@@ -1,7 +1,7 @@
 {
   "id": "jarvis-knowledge-bridge",
   "name": "Universal Knowledge Bridge",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "minAppVersion": "1.5.0",
   "description": "Synchronize approved notes with a bounded multi-vault knowledge bridge.",
   "author": "Texas Worship Project",
