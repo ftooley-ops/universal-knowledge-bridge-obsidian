@@ -52,7 +52,8 @@ class UniversalKnowledgeBridge extends obsidian_1.Plugin {
         new obsidian_1.Notice(`Knowledge bridge sync complete: ${pushed} note(s) pushed.`);
     }
     async listRemote() {
-        const response = await (0, obsidian_1.requestUrl)({ url: `${this.settings.bridgeUrl.replace(/\/$/, "")}/v1/notes/list`, method: "POST", headers: { Authorization: `Bearer ${this.settings.pairingToken}`, "content-type": "application/json" }, body: JSON.stringify({ vaultId: this.settings.vaultId, prefix: this.settings.approvedPrefix ? (0, obsidian_1.normalizePath)(this.settings.approvedPrefix) : "" }) });
+        const prefix = this.settings.approvedPrefix && this.settings.approvedPrefix !== "/" ? (0, obsidian_1.normalizePath)(this.settings.approvedPrefix) : "";
+        const response = await (0, obsidian_1.requestUrl)({ url: `${this.settings.bridgeUrl.replace(/\/$/, "")}/v1/notes/list`, method: "POST", headers: { Authorization: `Bearer ${this.settings.pairingToken}`, "content-type": "application/json" }, body: JSON.stringify({ vaultId: this.settings.vaultId, prefix }) });
         if (response.status >= 400)
             throw new Error(`Bridge list rejected: ${response.status}`);
         return response.json.data.notes;
