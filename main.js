@@ -9,47 +9,54 @@ class UniversalKnowledgeBridge extends obsidian_1.Plugin {
         this.addCommand({ id: "sync-approved-notes", name: "Sync approved notes", callback: () => void this.sync() });
     }
     async sync() {
-        if (!this.settings.bridgeUrl || !this.settings.pairingToken) {
-            new obsidian_1.Notice("Configure the knowledge bridge first.");
-            return;
-        }
-        if (!this.settings.vaultId) {
-            new obsidian_1.Notice("Set the registered vault ID first.");
-            return;
-        }
-        const files = this.app.vault.getMarkdownFiles().filter((f) => !this.settings.approvedPrefix || f.path.startsWith((0, obsidian_1.normalizePath)(this.settings.approvedPrefix)));
-        let pushed = 0;
-        const local = new Map(files.map((file) => [file.path, file]));
-        const remote = await this.listRemote();
-        for (const note of remote) {
-            const file = local.get(note.path);
-            if (!file) {
-                await this.app.vault.create(note.path, note.content);
+        try {
+            if (!this.settings.bridgeUrl || !this.settings.pairingToken) {
+                new obsidian_1.Notice("Configure the knowledge bridge first.");
+                return;
+            }
+            if (!this.settings.vaultId) {
+                new obsidian_1.Notice("Set the registered vault ID first.");
+                return;
+            }
+            const prefix = this.settings.approvedPrefix && this.settings.approvedPrefix !== "/" ? (0, obsidian_1.normalizePath)(this.settings.approvedPrefix) : "";
+            const files = this.app.vault.getMarkdownFiles().filter((f) => !prefix || f.path.startsWith(prefix));
+            let pushed = 0;
+            const local = new Map(files.map((file) => [file.path, file]));
+            const remote = await this.listRemote();
+            for (const note of remote) {
+                const file = local.get(note.path);
+                if (!file) {
+                    await this.app.vault.create(note.path, note.content);
+                    this.settings.lastSynced[note.path] = { version: note.version, hash: note.hash };
+                    continue;
+                }
+                const localContent = await this.app.vault.read(file);
+                const mark = this.settings.lastSynced[note.path];
+                if ((mark === null || mark === void 0 ? void 0 : mark.hash) === note.hash)
+                    continue;
+                if (mark && await digest(localContent) !== mark.hash) {
+                    new obsidian_1.Notice(`Conflict not overwritten: ${note.path}`);
+                    continue;
+                }
+                await this.app.vault.process(file, () => note.content);
                 this.settings.lastSynced[note.path] = { version: note.version, hash: note.hash };
-                continue;
             }
-            const localContent = await this.app.vault.read(file);
-            const mark = this.settings.lastSynced[note.path];
-            if ((mark === null || mark === void 0 ? void 0 : mark.hash) === note.hash)
-                continue;
-            if (mark && await digest(localContent) !== mark.hash) {
-                new obsidian_1.Notice(`Conflict not overwritten: ${note.path}`);
-                continue;
+            for (const file of files) {
+                const content = await this.app.vault.read(file);
+                const mark = this.settings.lastSynced[file.path];
+                if (!mark || await digest(content) !== mark.hash) {
+                    const note = await this.push(file, content, mark === null || mark === void 0 ? void 0 : mark.version);
+                    this.settings.lastSynced[file.path] = { version: note.version, hash: note.hash };
+                    pushed++;
+                }
             }
-            await this.app.vault.process(file, () => note.content);
-            this.settings.lastSynced[note.path] = { version: note.version, hash: note.hash };
+            await this.saveData(this.settings);
+            new obsidian_1.Notice(`Knowledge bridge sync complete: ${pushed} note(s) pushed.`);
         }
-        for (const file of files) {
-            const content = await this.app.vault.read(file);
-            const mark = this.settings.lastSynced[file.path];
-            if (!mark || await digest(content) !== mark.hash) {
-                const note = await this.push(file, content, mark === null || mark === void 0 ? void 0 : mark.version);
-                this.settings.lastSynced[file.path] = { version: note.version, hash: note.hash };
-                pushed++;
-            }
+        catch (error) {
+            new obsidian_1.Notice(`Knowledge bridge sync failed: ${error instanceof Error ? error.message : String(error)}`, 10000);
+            console.error("Universal Knowledge Bridge sync failed", error);
         }
-        await this.saveData(this.settings);
-        new obsidian_1.Notice(`Knowledge bridge sync complete: ${pushed} note(s) pushed.`);
     }
     async listRemote() {
         const prefix = this.settings.approvedPrefix && this.settings.approvedPrefix !== "/" ? (0, obsidian_1.normalizePath)(this.settings.approvedPrefix) : "";
