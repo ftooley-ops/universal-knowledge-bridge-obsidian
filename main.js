@@ -28,6 +28,7 @@ class UniversalKnowledgeBridge extends obsidian_1.Plugin {
             for (const note of remote) {
                 const file = local.get(note.path);
                 if (!file) {
+                    await this.ensureParentFolders(note.path);
                     await this.app.vault.create(note.path, note.content);
                     this.settings.lastSynced[note.path] = { version: note.version, hash: note.hash };
                     continue;
@@ -72,8 +73,10 @@ class UniversalKnowledgeBridge extends obsidian_1.Plugin {
             const existing = this.app.vault.getAbstractFileByPath(note.path);
             if (existing instanceof obsidian_1.TFile)
                 await this.app.vault.process(existing, () => note.content);
-            else
+            else {
+                await this.ensureParentFolders(note.path);
                 await this.app.vault.create(note.path, note.content);
+            }
             this.settings.lastSynced[note.path] = { version: note.version, hash: note.hash };
             await this.saveData(this.settings);
             new obsidian_1.Notice("Bridge-Test.md downloaded successfully.", 10000);
@@ -83,6 +86,11 @@ class UniversalKnowledgeBridge extends obsidian_1.Plugin {
             console.error("Universal Knowledge Bridge test pull failed", error);
         }
     }
+    async ensureParentFolders(path) { const parts = path.split("/"); parts.pop(); let current = ""; for (const part of parts) {
+        current = current ? `${current}/${part}` : part;
+        if (!this.app.vault.getAbstractFileByPath(current))
+            await this.app.vault.createFolder(current);
+    } }
     async listRemote() {
         const prefix = this.settings.approvedPrefix && this.settings.approvedPrefix !== "/" ? (0, obsidian_1.normalizePath)(this.settings.approvedPrefix) : "";
         const response = await (0, obsidian_1.requestUrl)({ url: `${this.settings.bridgeUrl.replace(/\/$/, "")}/v1/notes/list`, method: "POST", headers: { Authorization: `Bearer ${this.settings.pairingToken}`, "content-type": "application/json" }, body: JSON.stringify({ vaultId: this.settings.vaultId, prefix }) });
@@ -104,6 +112,15 @@ class BridgeSettings extends obsidian_1.PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
         containerEl.createEl("h2", { text: "Universal Knowledge Bridge" });
+        new obsidian_1.Setting(containerEl).setName("Test connection").setDesc("Check that this vault can reach the bridge.").addButton((b) => b.setButtonText("Test").onClick(async () => { try {
+            await this.plugin.listRemote();
+            new obsidian_1.Notice("Knowledge bridge connection successful.", 8000);
+        }
+        catch (error) {
+            new obsidian_1.Notice(`Connection failed: ${error instanceof Error ? error.message : String(error)}`, 10000);
+        } }));
+        new obsidian_1.Setting(containerEl).setName("Pull remote test note").setDesc("Download Bridge-Test.md from the bridge.").addButton((b) => b.setButtonText("Pull test note").onClick(() => void this.plugin.pullRemoteTest()));
+        new obsidian_1.Setting(containerEl).setName("Sync approved notes").setDesc("Synchronize notes using the configured folder boundary.").addButton((b) => b.setButtonText("Sync now").onClick(() => void this.plugin.sync()));
         new obsidian_1.Setting(containerEl).setName("Bridge URL").setDesc("HTTPS URL for the isolated bridge service.").addText((t) => t.setValue(this.plugin.settings.bridgeUrl).onChange(async (v) => { this.plugin.settings.bridgeUrl = v.trim(); await this.plugin.saveData(this.plugin.settings); }));
         new obsidian_1.Setting(containerEl).setName("Registered vault ID").setDesc("Stable bridge vault ID; it is not the device filesystem path.").addText((t) => t.setValue(this.plugin.settings.vaultId).onChange(async (v) => { this.plugin.settings.vaultId = v.trim(); await this.plugin.saveData(this.plugin.settings); }));
         new obsidian_1.Setting(containerEl).setName("Pairing token").setDesc("Stored in plugin data, never in a note.").addText((t) => t.setValue(this.plugin.settings.pairingToken).onChange(async (v) => { this.plugin.settings.pairingToken = v; await this.plugin.saveData(this.plugin.settings); }));
