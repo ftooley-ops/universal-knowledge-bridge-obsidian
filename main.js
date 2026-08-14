@@ -93,13 +93,13 @@ class UniversalKnowledgeBridge extends obsidian_1.Plugin {
     } }
     async listRemote() {
         const prefix = this.settings.approvedPrefix && this.settings.approvedPrefix !== "/" ? (0, obsidian_1.normalizePath)(this.settings.approvedPrefix) : "";
-        const response = await (0, obsidian_1.requestUrl)({ url: `${this.settings.bridgeUrl.replace(/\/$/, "")}/v1/notes/list`, method: "POST", headers: { Authorization: `Bearer ${this.settings.pairingToken}`, "content-type": "application/json" }, body: JSON.stringify({ vaultId: this.settings.vaultId, prefix }) });
+        const response = await (0, obsidian_1.requestUrl)({ url: `${this.settings.bridgeUrl.replace(/\/$/, "")}/v1/notes/list`, method: "POST", headers: { Authorization: `Bearer ${this.settings.pairingToken}`, "x-bridge-client": "obsidian-companion", "content-type": "application/json" }, body: JSON.stringify({ vaultId: this.settings.vaultId, prefix }) });
         if (response.status >= 400)
             throw new Error(`Bridge list rejected: ${response.status}`);
         return response.json.data.notes;
     }
     async push(file, content, expectedVersion) {
-        const response = await (0, obsidian_1.requestUrl)({ url: `${this.settings.bridgeUrl.replace(/\/$/, "")}/v1/notes/write`, method: "POST", headers: { Authorization: `Bearer ${this.settings.pairingToken}`, "content-type": "application/json" }, body: JSON.stringify({ vaultId: this.settings.vaultId, path: file.path, content, expectedVersion, mode: "replace", source: "obsidian-companion" }) });
+        const response = await (0, obsidian_1.requestUrl)({ url: `${this.settings.bridgeUrl.replace(/\/$/, "")}/v1/notes/write`, method: "POST", headers: { Authorization: `Bearer ${this.settings.pairingToken}`, "x-bridge-client": "obsidian-companion", "content-type": "application/json" }, body: JSON.stringify({ vaultId: this.settings.vaultId, path: file.path, content, expectedVersion, mode: "replace", source: "obsidian-companion" }) });
         if (response.status >= 400)
             throw new Error(`Bridge rejected ${file.path}: ${response.status}`);
         return response.json.data.note;
