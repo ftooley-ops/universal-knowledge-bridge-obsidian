@@ -8,6 +8,15 @@ class UniversalKnowledgeBridge extends obsidian_1.Plugin {
         this.addSettingTab(new BridgeSettings(this.app, this));
         this.addCommand({ id: "sync-approved-notes", name: "Sync approved notes", callback: () => void this.sync() });
         this.addCommand({ id: "pull-remote-test-note", name: "Pull remote test note", callback: () => void this.pullRemoteTest() });
+        this.registerEvent(this.app.vault.on("delete", (file) => {
+            if (!(file instanceof obsidian_1.TFile) || !file.path.endsWith(".md")) return;
+            const mark = this.settings.lastSynced[file.path];
+            if (!mark) return;
+            void this.deleteRemote(file.path).then(() => {
+                delete this.settings.lastSynced[file.path];
+                return this.saveData(this.settings);
+            }).catch((error) => new obsidian_1.Notice(`Bridge deletion failed: ${error instanceof Error ? error.message : String(error)}`, 10000));
+        }));
     }
     async sync() {
         new obsidian_1.Notice("Knowledge bridge sync started.", 5000);
@@ -117,6 +126,7 @@ class UniversalKnowledgeBridge extends obsidian_1.Plugin {
     }
     async deleteRemote(path) {
         const response = await (0, obsidian_1.requestUrl)({ url: `${this.settings.bridgeUrl.replace(/\/$/, "")}/v1/notes/delete`, method: "POST", headers: { Authorization: `Bearer ${this.settings.pairingToken}`, "x-bridge-client": "obsidian-companion", "content-type": "application/json" }, body: JSON.stringify({ vaultId: this.settings.vaultId, path, source: "obsidian-companion" }) });
+        if (response.status === 404) return null;
         if (response.status >= 400)
             throw new Error(`Bridge delete rejected ${path}: ${response.status}`);
         return response.json.data.note;
