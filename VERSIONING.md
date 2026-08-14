@@ -9,4 +9,4 @@ No updated plugin may be released, installed, or reported as complete without:
 3. the package rebuilt or checked;
 4. the new version recorded in the handoff.
 
-Current release: `1.0.7`.
+Current release: `1.0.8`.
